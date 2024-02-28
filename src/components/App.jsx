@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useEffect, useState } from 'react';
 import { getImagesApi } from '../api/images';
 import ImageGallery from './ImageGallery/ImageGallery';
 import Button from './Button/Button';
@@ -6,75 +6,63 @@ import Searchbar from './Searchbar/Searchbar';
 import Loader from './Loader/Loader';
 import Modal from './Modal/Modal';
 import css from './App.module.css';
-class App extends Component {
-  state = {
-    images: [],
-    page: 1,
-    query: '',
-    isLoading: false,
-    showModal: false,
-    largeImageURL: '',
-    loadMore: false,
+
+const App = () => {
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [largeImageURL, setLargeImageURL] = useState('');
+  const [loadMore, setLoadMore] = useState(false);
+
+  useEffect(() => {
+    if (!query) return;
+    const getImages = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getImagesApi(page, query);
+        setImages(prevImages => [...prevImages, ...data.hits]);
+        setLoadMore(page < Math.ceil(data.totalHits / 12));
+      } catch (error) {
+        console.error(error.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    getImages();
+  }, [query, page]);
+
+  const handleSearch = query => {
+    setQuery(query);
+    setPage(1);
+    setImages([]);
   };
 
-  componentDidUpdate(prevProps, prevState) {
-    const { query, page } = this.state;
-    if (query !== prevState.query || page !== prevState.page) {
-      this.getImages();
-    }
-  }
-
-  handleSearch = query => {
-    this.setState({ query: query, page: 1, images: [] });
+  const handleLoadMore = () => {
+    setPage(prevPage => prevPage + 1);
   };
 
-  getImages = async () => {
-    this.setState({ isLoading: true });
-    const { page, query } = this.state;
-    try {
-      const data = await getImagesApi(page, query);
-      this.setState(prevState => ({
-        images: [...prevState.images, ...data.hits],
-        loadMore: this.state.page < Math.ceil(data.totalHits / 12),
-      }));
-    } catch (error) {
-      console.error(error.message);
-    } finally {
-      this.setState({ isLoading: false });
-    }
+  const toggleModal = () => {
+    setShowModal(prevShowModal => !prevShowModal);
   };
 
-  handleLoadMore = () => {
-    this.setState(prevState => ({ page: prevState.page + 1 }));
+  const handleImageClick = largeImageURL => {
+    setLargeImageURL(largeImageURL);
+    toggleModal();
   };
 
-  toggleModal = () => {
-    this.setState(({ showModal }) => ({ showModal: !showModal }));
-  };
+  return (
+    <div className={css.App}>
+      <Searchbar handleSearch={handleSearch} query={query} />
+      <ImageGallery images={images} onClick={handleImageClick} />
+      {isLoading && <Loader />}
+      {loadMore && <Button handleLoadMore={handleLoadMore} />}
+      {showModal && (
+        <Modal largeImageURL={largeImageURL} onClose={toggleModal} />
+      )}
+    </div>
+  );
+};
 
-  handleImageClick = largeImageURL => {
-    this.setState({ largeImageURL });
-    this.toggleModal();
-  };
-
-  render() {
-    return (
-      <div className={css.App}>
-        <Searchbar handleSearch={this.handleSearch} query={this.state.query} />
-        <ImageGallery
-          images={this.state.images}
-          onClick={this.handleImageClick}
-        />
-        {this.state.isLoading && <Loader />}
-        {this.state.loadMore && <Button handleLoadMore={this.handleLoadMore} />}
-        {this.state.showModal && (
-          <Modal
-            largeImageURL={this.state.largeImageURL}
-            onClose={this.toggleModal}
-          />
-        )}
-      </div>
-    );
-  }
-}
 export default App;
